@@ -1,88 +1,93 @@
-// --- Data Analysis Logic (JavaScript implementation) ---
-export function generateInsights(data) {
-    if (!data || data.length === 0) return null;
-    
-    const headers = Object.keys(data[0]);
-    const rowCount = data.length;
-    const colCount = headers.length;
+import Papa from 'papaparse';
 
-    const insights = {};
+// Helper function to create a summary table from a DataFrame description
+const createSummaryTable = (description) => {
+    if (!description || description.empty) return null;
+    // Reset index to make the statistic (e.g., 'mean', 'std') a column
+    const formatted = description.reset_index();
+    const headers = formatted.columns.tolist().toJs();
+    const rows = formatted.values.toJs().map(row => 
+        row.map(val => (typeof val === 'number' ? parseFloat(val.toFixed(2)) : val))
+    );
+    return { headers, rows };
+};
 
-    // 1. Data Shape
-    insights['Data Shape'] = { rows: rowCount, cols: colCount };
+// Main analysis function
+export const analyzeData = (file) => {
+    // FIX: Add validation to ensure the input is a valid file object.
+    // This prevents the FileReader error and subsequent crashes.
+    if (!(file instanceof Blob)) {
+        return Promise.reject(new Error("Invalid input: A file object is required for analysis."));
+    }
 
-    // 2. Data Types & Missing Values
-    const typeCounts = {};
-    const missingValues = {};
-    headers.forEach(h => {
-        missingValues[h] = 0;
-        let isNumeric = true;
-        for(const row of data) {
-            if (row[h] === null || row[h] === undefined || row[h] === '') {
-                missingValues[h]++;
+    return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                try {
+                    // Add check for empty or malformed CSV data
+                    if (!results || !results.data || results.data.length === 0) {
+                        return reject(new Error("Parsing failed: The CSV file might be empty or improperly formatted."));
+                    }
+                    
+                    const df = new dfd.DataFrame(results.data);
+                    let insights = {};
+
+                    // 1. Data Shape
+                    const [rows, cols] = df.shape;
+                    insights['Data Shape'] = { rows, cols };
+
+                    // 2. Data Types & Chart Data
+                    const dtypes = df.dtypes.toJs();
+                    const typeCounts = {};
+                    const typeRows = [];
+                    Object.entries(dtypes).forEach(([col, type]) => {
+                        typeRows.push([col, type]);
+                        typeCounts[type] = (typeCounts[type] || 0) + 1;
+                    });
+                    insights['Data Types'] = { headers: ['Column', 'Data Type'], rows: typeRows };
+                    insights.dataTypeChartData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
+                    
+                    // 3. Missing Values & Chart Data
+                    const missing = df.isnull().sum();
+                    const missingValues = missing.toJs().filter(val => val[1] > 0);
+                    if (missingValues.length > 0) {
+                        insights['Missing Values'] = { headers: ['Column', 'Missing Count'], rows: missingValues };
+                        insights.missingValuesChartData = missingValues.map(([name, count]) => ({ name, count }));
+                    } else {
+                        insights.missingValuesChartData = [];
+                    }
+
+                    // 4. Numeric Summary
+                    const numericSummary = createSummaryTable(df.describe());
+                    if (numericSummary) insights['Numeric Summary'] = numericSummary;
+                    
+                    // 5. Categorical Summary
+                    const categoricalCols = df.columns.toJs().filter(c => df.col(c).dtype === 'string');
+                    if (categoricalCols.length > 0) {
+                        const categoricalSummary = createSummaryTable(df.select(categoricalCols).describe());
+                        if (categoricalSummary) insights['Categorical Summary'] = categoricalSummary;
+                    }
+                    
+                    // 6. Data Preview
+                    const head = df.head(5);
+                    insights['Data Preview'] = {
+                        headers: head.columns.toJs(),
+                        rows: head.values.toJs()
+                    };
+
+                    resolve(insights);
+                } catch (error) {
+                    console.error("Error during data analysis:", error);
+                    reject(error);
+                }
+            },
+            error: (error) => {
+                console.error("PapaParse error:", error);
+                reject(error);
             }
-            if (isNumeric && row[h] !== '' && !/^-?\d*\.?\d+$/.test(row[h])) {
-                isNumeric = false;
-            }
-        }
-        typeCounts[h] = isNumeric ? 'Numeric' : 'Categorical';
+        });
     });
-    insights['Data Types'] = Object.entries(typeCounts).map(([col, type]) => ({ Column: col, "Data Type": type }));
-    
-    // -- FIX was here --
-    insights['Missing Values'] = Object.entries(missingValues)
-        .filter(([, count]) => count > 0)
-        .map(([col, count]) => ({ Column: col, "Missing Count": count }));
-
-    // 3. Statistical Summaries
-    const numericCols = headers.filter(h => typeCounts[h] === 'Numeric');
-    if (numericCols.length > 0) {
-        const numericSummary = {};
-        numericCols.forEach(col => {
-            const values = data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
-             if (values.length === 0) {
-                 numericSummary[col] = { count: 0, mean: 'N/A', std: 'N/A', min: 'N/A', max: 'N/A' };
-                 return;
-            }
-            const sum = values.reduce((a, b) => a + b, 0);
-            const mean = sum / values.length;
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            const std = Math.sqrt(values.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / values.length);
-            numericSummary[col] = {
-                count: values.length, mean: mean.toFixed(2), std: std.toFixed(2),
-                min: min.toFixed(2), max: max.toFixed(2)
-            };
-        });
-        insights['Numeric Summary'] = Object.entries(numericSummary).map(([col, stats]) => ({ Column: col, ...stats }));
-    }
-
-    const categoricalCols = headers.filter(h => typeCounts[h] === 'Categorical');
-    if (categoricalCols.length > 0) {
-        const categoricalSummary = {};
-        categoricalCols.forEach(col => {
-            const values = data.map(row => row[col]).filter(v => v);
-             if (values.length === 0) {
-                 categoricalSummary[col] = { count: 0, unique: 0, top: 'N/A', freq: 'N/A' };
-                 return;
-            }
-            const unique = [...new Set(values)];
-            const top = values.reduce((acc, v) => ({ ...acc, [v]: (acc[v] || 0) + 1 }), {});
-            const topValue = Object.keys(top).reduce((a, b) => top[a] > top[b] ? a : b, '');
-
-            categoricalSummary[col] = {
-                count: values.length,
-                unique: unique.length,
-                top: topValue,
-                freq: top[topValue]
-            };
-        });
-        insights['Categorical Summary'] = Object.entries(categoricalSummary).map(([col, stats]) => ({ Column: col, ...stats }));
-    }
-
-    // 4. Data Preview
-    insights['Data Preview'] = data.slice(0, 5);
-
-    return insights;
-}
+};
 

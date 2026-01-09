@@ -20,7 +20,7 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
     const handleFileChange = (e) => handleFile(e.target.files[0]);
 
     const handleFile = (file) => {
-        if(file && file.type === 'text/csv'){
+        if (file && file.type === 'text/csv') {
             setLoading(true);
             setError(null);
             setTimeout(() => onFileSelect(file), 500);
@@ -28,7 +28,7 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
             setError("Invalid file type. Please upload a CSV file.");
         }
     };
-    
+
     const dropzoneClass = isDragging ? 'dropzone dragging' : 'dropzone';
 
     return (
@@ -39,9 +39,9 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
                 transition={{ duration: 0.5 }}
                 className="upload-screen-content"
             >
-                <h1 className="gradient-text">AI Data Insights</h1>
-                <p>Upload a CSV file to generate an instant, interactive analysis dashboard.</p>
-                
+                <h1 className="gradient-text">VizMind</h1>
+                <p>Unlock deep insights from your data with AI-powered visualization.</p>
+
                 <label
                     onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                     className={dropzoneClass}

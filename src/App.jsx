@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateInsights } from './utils/dataAnalyzer';
+
+import { analyzeData } from './utils/dataAnalyzer';
 import FileUploadScreen from './components/FileUploadScreen';
 import Dashboard from './components/Dashboard';
 import { Icon } from './components/Icon';
@@ -12,34 +13,31 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const handleFileSelect = useCallback((selectedFile) => {
+    const handleFileSelect = useCallback(async (selectedFile) => {
         setFile(selectedFile);
-        Papa.parse(selectedFile, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                const newInsights = generateInsights(results.data);
-                setInsights(newInsights);
-                setIsLoading(false);
-            },
-            error: (err) => {
-                setError("Failed to parse CSV file: " + err.message);
-                setIsLoading(false);
-            }
-        });
+        setIsLoading(true);
+        setError(null);
+        try {
+            const newInsights = await analyzeData(selectedFile);
+            setInsights(newInsights);
+        } catch (err) {
+            setError("Analysis failed: " + err.message);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
-    
+
     const handleReset = () => {
         setFile(null);
         setInsights(null);
         setError(null);
     };
-    
+
     return (
-         <div className="app-container">
+        <div className="app-container">
             <AnimatePresence>
                 {isLoading && (
-                    <motion.div 
+                    <motion.div
                         key="loader"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -53,13 +51,13 @@ function App() {
             </AnimatePresence>
             <AnimatePresence>
                 {!file ? (
-                     <motion.div key="uploader" exit={{ opacity: 0, scale: 0.9 }}>
-                         <FileUploadScreen onFileSelect={handleFileSelect} setLoading={setIsLoading} setError={setError} />
-                     </motion.div>
+                    <motion.div key="uploader" exit={{ opacity: 0, scale: 0.9 }}>
+                        <FileUploadScreen onFileSelect={handleFileSelect} setLoading={setIsLoading} setError={setError} />
+                    </motion.div>
                 ) : (
-                     <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                         <Dashboard insights={insights} filename={file.name} onReset={handleReset} />
-                     </motion.div>
+                    <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <Dashboard insights={insights} filename={file.name} onReset={handleReset} />
+                    </motion.div>
                 )}
             </AnimatePresence>
             <AnimatePresence>
@@ -79,7 +77,7 @@ function App() {
                     </motion.div>
                 )}
             </AnimatePresence>
-         </div>
+        </div>
     );
 }
 
