@@ -13,34 +13,58 @@ export const initOpenAI = (apiKey) => {
 
 export const getAIInsights = async (dataSummary, userQuery) => {
     if (!openai) {
-        throw new Error("OpenAI is not initialized. Please provide an API key.");
+        throw new Error("OpenAI is not initialized. Please provide an API key in the settings.");
     }
 
+    // Prepare a more structured data summary for the AI
+    const statsJSON = JSON.stringify({
+        rows: dataSummary['Data Shape']?.rows,
+        columns: dataSummary['Data Shape']?.cols,
+        dataTypes: dataSummary['Data Types']?.rows,
+        missingValues: dataSummary['Missing Values']?.rows || "None",
+        numericSummary: dataSummary['Numeric Summary']?.rows,
+        categoricalSummary: dataSummary['Categorical Summary']?.rows,
+        sampleData: dataSummary['Data Preview']?.rows
+    }, null, 2);
+
+    const systemMessage = `
+        You are VizMind AI, a premium data science consultant. 
+        Your goal is to provide deep, actionable insights based on the provided dataset statistics.
+        
+        Guidelines:
+        1. Accuracy First: Only state findings supported by the data provided.
+        2. Insightful: Look for correlations, skewness, or anomalies in the numeric summaries.
+        3. Professional: Use clear, technical but accessible language.
+        4. Structured: Use Markdown (headers, bold text, lists) for readability.
+        5. Concise: Get to the point quickly.
+        
+        If asked something not related to the data, politely redirect the user back to the data analysis.
+    `;
+
     const prompt = `
-        You are an expert data analyst. You are provided with a summary of a dataset and a user query.
-        Dataset Summary:
-        ${JSON.stringify(dataSummary, null, 2)}
+        DATABASE CONTEXT:
+        ${statsJSON}
 
-        User Query: ${userQuery}
+        USER QUESTION: 
+        "${userQuery}"
 
-        Provide a concise, professional, and highly insightful response. 
-        Focus on trends, anomalies, or specific answers based on the statistics provided.
-        Format your response using markdown.
+        Please provide your analysis:
     `;
 
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "gpt-3.5-turbo", // Defaulting to 3.5 for speed, but instructions allow for power
             messages: [
-                { role: "system", content: "You are a helpful assistant that analyzes data insights." },
+                { role: "system", content: systemMessage },
                 { role: "user", content: prompt }
             ],
-            temperature: 0.7,
+            temperature: 0.5, // Lower temperature for more factual analysis
         });
 
         return response.choices[0].message.content;
     } catch (error) {
-        console.error("OpenAI Error:", error);
-        throw new Error(error.message || "Failed to get AI insights.");
+        console.error("OpenAI Execution Error:", error);
+        if (error.status === 401) throw new Error("Invalid API Key. Please update it in the settings.");
+        throw new Error(error.message || "The AI encountered an error while processing your request.");
     }
 };

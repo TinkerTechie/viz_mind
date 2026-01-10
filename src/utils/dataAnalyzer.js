@@ -2,20 +2,29 @@ import Papa from 'papaparse';
 
 // Helper function to create a summary table from a DataFrame description
 const createSummaryTable = (description) => {
-    if (!description || description.empty) return null;
-    // Reset index to make the statistic (e.g., 'mean', 'std') a column
-    const formatted = description.reset_index();
-    const headers = formatted.columns.tolist().toJs();
-    const rows = formatted.values.toJs().map(row => 
-        row.map(val => (typeof val === 'number' ? parseFloat(val.toFixed(2)) : val))
-    );
-    return { headers, rows };
+    try {
+        if (!description || !description.values) return null;
+
+        // In Danfo.js v1+, description can be complex. We extract numeric summaries.
+        const headers = ["Statistic", ...description.columns];
+        const rows = description.values.map((row, i) => {
+            const statName = description.index[i];
+            const formattedRow = row.map(val => {
+                if (typeof val === 'number' && !isNaN(val)) {
+                    return parseFloat(val.toFixed(2));
+                }
+                return (val === null || val === undefined) ? '-' : val;
+            });
+            return [statName, ...formattedRow];
+        });
+        return { headers, rows };
+    } catch (e) {
+        console.error("Summary table creation failed:", e);
+        return null;
+    }
 };
 
-// Main analysis function
 export const analyzeData = (file) => {
-    // FIX: Add validation to ensure the input is a valid file object.
-    // This prevents the FileReader error and subsequent crashes.
     if (!(file instanceof Blob)) {
         return Promise.reject(new Error("Invalid input: A file object is required for analysis."));
     }
@@ -23,71 +32,123 @@ export const analyzeData = (file) => {
     return new Promise((resolve, reject) => {
         Papa.parse(file, {
             header: true,
+            dynamicTyping: true,
             skipEmptyLines: true,
             complete: (results) => {
                 try {
-                    // Add check for empty or malformed CSV data
                     if (!results || !results.data || results.data.length === 0) {
-                        return reject(new Error("Parsing failed: The CSV file might be empty or improperly formatted."));
+                        return reject(new Error("Parsing failed: The CSV file is empty."));
                     }
-                    
-                    const df = new dfd.DataFrame(results.data);
+
+                    const danfo = window.dfd;
+                    if (!danfo) {
+                        return reject(new Error("Danfo.js not loaded. Check your internet connection or script tag."));
+                    }
+
+                    const df = new danfo.DataFrame(results.data);
+
+                    // DEBUG: Log available methods if something fails
+                    console.log("DataFrame initialized. Shape:", df.shape);
+
                     let insights = {};
 
                     // 1. Data Shape
                     const [rows, cols] = df.shape;
                     insights['Data Shape'] = { rows, cols };
 
-                    // 2. Data Types & Chart Data
-                    const dtypes = df.dtypes.toJs();
-                    const typeCounts = {};
+                    // 2. Data Types
+                    // In v1.1.2 it's .ctypes, but let's be safe
+                    const colNames = df.columns;
+                    const colTypes = df.ctypes ? df.ctypes.values : (df.dtypes ? df.dtypes.values : []);
+
                     const typeRows = [];
-                    Object.entries(dtypes).forEach(([col, type]) => {
-                        typeRows.push([col, type]);
+                    const typeCounts = {};
+
+                    colNames.forEach((name, i) => {
+                        const type = colTypes[i] || 'unknown';
+                        typeRows.push([name, type]);
                         typeCounts[type] = (typeCounts[type] || 0) + 1;
                     });
+
                     insights['Data Types'] = { headers: ['Column', 'Data Type'], rows: typeRows };
                     insights.dataTypeChartData = Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
-                    
-                    // 3. Missing Values & Chart Data
-                    const missing = df.isnull().sum();
-                    const missingValues = missing.toJs().filter(val => val[1] > 0);
+
+                    // 3. Missing Values
+                    // Try different variants for Danfo.js 1.x
+                    let missingValues = [];
+                    let missingValuesChart = [];
+
+                    try {
+                        // Try is_na (Danfo 1.x) then isna then isnull
+                        const missingMethod = df.is_na ? df.is_na.bind(df) : (df.isna ? df.isna.bind(df) : (df.isnull ? df.isnull.bind(df) : null));
+
+                        if (missingMethod) {
+                            const missingSeries = missingMethod().sum();
+                            missingSeries.index.forEach((col, i) => {
+                                const count = missingSeries.values[i];
+                                if (count > 0) {
+                                    missingValues.push([col, count]);
+                                    missingValuesChart.push({ name: col, count });
+                                }
+                            });
+                        } else {
+                            // Fallback to manual check if all else fails
+                            colNames.forEach(col => {
+                                const colData = df[col].values;
+                                const count = colData.filter(v => v === null || v === undefined || v === "").length;
+                                if (count > 0) {
+                                    missingValues.push([col, count]);
+                                    missingValuesChart.push({ name: col, count });
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.warn("Missing value detection fallback initiated", e);
+                    }
+
+                    insights.missingValuesChartData = missingValuesChart;
                     if (missingValues.length > 0) {
                         insights['Missing Values'] = { headers: ['Column', 'Missing Count'], rows: missingValues };
-                        insights.missingValuesChartData = missingValues.map(([name, count]) => ({ name, count }));
-                    } else {
-                        insights.missingValuesChartData = [];
                     }
 
                     // 4. Numeric Summary
-                    const numericSummary = createSummaryTable(df.describe());
-                    if (numericSummary) insights['Numeric Summary'] = numericSummary;
-                    
-                    // 5. Categorical Summary
-                    const categoricalCols = df.columns.toJs().filter(c => df.col(c).dtype === 'string');
-                    if (categoricalCols.length > 0) {
-                        const categoricalSummary = createSummaryTable(df.select(categoricalCols).describe());
-                        if (categoricalSummary) insights['Categorical Summary'] = categoricalSummary;
+                    try {
+                        const numericDf = df.select_dtypes(['int32', 'int64', 'float32', 'float64']);
+                        if (numericDf && numericDf.columns.length > 0) {
+                            const desc = numericDf.describe();
+                            const summary = createSummaryTable(desc);
+                            if (summary) insights['Numeric Summary'] = summary;
+                        }
+                    } catch (e) {
+                        console.warn("Numeric summary processing skipped", e);
                     }
-                    
+
+                    // 5. Categorical Summary
+                    try {
+                        const categoricalCols = colNames.filter((c, i) => colTypes[i] === 'string');
+                        if (categoricalCols.length > 0) {
+                            const catDf = df.loc({ columns: categoricalCols });
+                            const desc = catDf.describe();
+                            const summary = createSummaryTable(desc);
+                            if (summary) insights['Categorical Summary'] = summary;
+                        }
+                    } catch (e) {
+                        console.warn("Categorical summary processing skipped", e);
+                    }
+
                     // 6. Data Preview
-                    const head = df.head(5);
                     insights['Data Preview'] = {
-                        headers: head.columns.toJs(),
-                        rows: head.values.toJs()
+                        headers: df.columns,
+                        rows: df.head(5).values
                     };
 
                     resolve(insights);
                 } catch (error) {
-                    console.error("Error during data analysis:", error);
-                    reject(error);
+                    console.error("Critical analysis error:", error);
+                    reject(new Error("Data analysis failed due to library version mismatch. Please try a different CSV or check for updates."));
                 }
             },
-            error: (error) => {
-                console.error("PapaParse error:", error);
-                reject(error);
-            }
+            error: (error) => reject(new Error("File parsing error: " + error.message))
         });
     });
 };
-
