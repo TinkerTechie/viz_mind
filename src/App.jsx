@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { analyzeData } from './utils/dataAnalyzer';
 import FileUploadScreen from './components/FileUploadScreen';
 import Dashboard from './components/Dashboard';
-import { Icon } from './Icon';
+import { Icon } from './components/Icon';
 
 function App() {
     const [file, setFile] = useState(null);

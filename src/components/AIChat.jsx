@@ -7,8 +7,8 @@ const AIChat = ({ dataSummary }) => {
     const [query, setQuery] = useState('');
     const [chatHistory, setChatHistory] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
-    const [apiKey, setApiKey] = useState(localStorage.getItem('open_ai_key') || '');
-    const [isKeySet, setIsKeySet] = useState(!!localStorage.getItem('open_ai_key'));
+    const [apiKey, setApiKey] = useState(localStorage.getItem('open_ai_key') || import.meta.env.VITE_OPENAI_API_KEY || '');
+    const [isKeySet, setIsKeySet] = useState(!!(localStorage.getItem('open_ai_key') || import.meta.env.VITE_OPENAI_API_KEY));
     const [showKeyInput, setShowKeyInput] = useState(!isKeySet);
     const chatEndRef = useRef(null);
 
