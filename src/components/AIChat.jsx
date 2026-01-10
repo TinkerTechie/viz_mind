@@ -10,6 +10,7 @@ const AIChat = ({ dataSummary }) => {
     const [apiKey, setApiKey] = useState(localStorage.getItem('open_ai_key') || import.meta.env.VITE_OPENAI_API_KEY || '');
     const [isKeySet, setIsKeySet] = useState(!!(localStorage.getItem('open_ai_key') || import.meta.env.VITE_OPENAI_API_KEY));
     const [showKeyInput, setShowKeyInput] = useState(!isKeySet);
+    const [error, setError] = useState(null);
     const chatEndRef = useRef(null);
 
     useEffect(() => {
@@ -22,12 +23,23 @@ const AIChat = ({ dataSummary }) => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatHistory, isThinking]);
 
-    const handleSaveKey = () => {
-        if (apiKey.trim()) {
-            localStorage.setItem('open_ai_key', apiKey);
-            initOpenAI(apiKey);
-            setIsKeySet(true);
-            setShowKeyInput(false);
+    const handleSaveKey = async () => {
+        if (!apiKey.trim()) return;
+
+        setIsThinking(true);
+        try {
+            // Simple validation attempt
+            const isValid = await initOpenAI(apiKey);
+            if (isValid) {
+                localStorage.setItem('open_ai_key', apiKey);
+                setIsKeySet(true);
+                setShowKeyInput(false);
+                setError(null);
+            }
+        } catch (e) {
+            setError("Invalid API Key format.");
+        } finally {
+            setIsThinking(false);
         }
     };
 
@@ -48,10 +60,18 @@ const AIChat = ({ dataSummary }) => {
                 timestamp: new Date().toLocaleTimeString()
             }]);
         } catch (error) {
+            console.error("AI Chat Error:", error);
+            let userFeedback = `Error: ${error.message}`;
+
+            if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+                userFeedback = "⚠️ API Quota Exceeded. You've reached your OpenAI plan limit. Please check your billing details at platform.openai.com/account/billing or upgrade your plan.";
+            }
+
             setChatHistory(prev => [...prev, {
                 role: 'error',
-                content: `Error: ${error.message}. Please check your API key and connection.`,
-                timestamp: new Date().toLocaleTimeString()
+                content: userFeedback,
+                timestamp: new Date().toLocaleTimeString(),
+                isRetryable: true
             }]);
         } finally {
             setIsThinking(false);
@@ -179,13 +199,14 @@ const AIChat = ({ dataSummary }) => {
                 />
                 <button
                     onClick={handleSend}
-                    disabled={isThinking || !isKeySet || !query.trim()}
+                    disabled={isThinking || !query.trim()}
                     className="header-button"
                     style={{
                         background: 'var(--primary)',
                         borderColor: 'transparent',
                         padding: '0 1.5rem',
-                        opacity: (isThinking || !isKeySet || !query.trim()) ? 0.5 : 1
+                        opacity: (isThinking || !query.trim()) ? 0.5 : 1,
+                        cursor: (isThinking || !query.trim()) ? 'not-allowed' : 'pointer'
                     }}
                 >
                     <Icon name={isThinking ? "Loader2" : "Send"} size={18} className={isThinking ? "spin" : ""} />

@@ -31,24 +31,18 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
     };
 
     const handleFile = (file) => {
-        // Clear previous error
         setError(null);
-
-        // Validate file existence and type
         if (!file) return;
 
-        // Check extension/mime type (some systems don't provide text/csv for all CSVs)
         const isCsv = file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv' || file.type === 'application/vnd.ms-excel';
 
         if (isCsv) {
             setFileName(file.name);
             setLoading(true);
-            // Artificial delay for premium UX transition
             setTimeout(() => onFileSelect(file), 1200);
         } else {
             setFileName(null);
             setError("Invalid file format. Please upload a .csv file.");
-            // Reset input value so same file can be selected again if fixed
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
@@ -62,14 +56,14 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
     return (
         <div className="upload-screen-container">
             <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
                 className="upload-screen-content"
             >
-                <div className="brand-badge">Powered by AI</div>
-                <h1 className="gradient-text">VizMind</h1>
-                <p>Upload your dataset and let VizMind uncover the hidden stories within your data.</p>
+                <div className="brand-badge">POWERED BY AI</div>
+                <h1 className="logo-title">VizMind</h1>
+                <p className="tagline">Upload your dataset and let VizMind uncover the hidden stories within your data.</p>
 
                 <div
                     onDragEnter={handleDrag}
@@ -77,7 +71,7 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                     onClick={openFilePicker}
-                    className={`dropzone ${isDragging ? 'dragging' : ''} ${fileName ? 'has-file' : ''}`}
+                    className={`dropzone-v2 ${isDragging ? 'dragging' : ''} ${fileName ? 'has-file' : ''}`}
                 >
                     <input
                         type="file"
@@ -91,40 +85,37 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
                         <AnimatePresence mode="wait">
                             {!fileName ? (
                                 <motion.div
-                                    key="upload-icon"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
+                                    key="upload-state"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
                                     className="dropzone-state"
                                 >
-                                    <Icon name="UploadCloud" size={48} className="dropzone-icon" />
-                                    <span className="dropzone-text">
-                                        Drag & drop a file or <span className="dropzone-text-highlight">click to upload</span>
+                                    <Icon name="UploadCloud" size={48} className="drop-icon" />
+                                    <span className="drop-main-text">
+                                        Drag & drop a file or <span className="highlight-text">click to upload</span>
                                     </span>
-                                    <span className="dropzone-subtext">Supports .csv files up to 10MB</span>
+                                    <span className="drop-sub-text">Supports .csv files up to 10MB</span>
                                 </motion.div>
                             ) : (
                                 <motion.div
-                                    key="file-icon"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
+                                    key="file-state"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
                                     className="dropzone-state"
                                 >
-                                    <div className="file-avatar">
-                                        <Icon name="FileText" size={40} />
-                                    </div>
-                                    <span className="dropzone-text file-selected-name">{fileName}</span>
-                                    <span className="dropzone-subtext ready-text">File ready for analysis</span>
+                                    <Icon name="FileText" size={48} className="drop-icon" />
+                                    <span className="drop-main-text">{fileName}</span>
+                                    <span className="drop-sub-text">Ready for analysis</span>
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
                 </div>
 
-                <div className="upload-features">
-                    <div className="feature"><Icon name="Zap" size={14} /> Instant Processing</div>
-                    <div className="feature"><Icon name="Lock" size={14} /> Data Privacy</div>
-                    <div className="feature"><Icon name="Shield" size={14} /> Secure Storage</div>
+                <div className="upload-footer-features">
+                    <div className="footer-feature"><Icon name="Zap" size={14} /> Instant Processing</div>
+                    <div className="footer-feature"><Icon name="Lock" size={14} /> Data Privacy</div>
+                    <div className="footer-feature"><Icon name="Shield" size={14} /> Secure Storage</div>
                 </div>
             </motion.div>
         </div>

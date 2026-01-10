@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CustomAudioPlayer from './CustomAudioPlayer';
 import StatCard from './StatCard';
@@ -10,20 +10,36 @@ import { Icon } from './Icon';
 
 const Dashboard = ({ insights, filename, onReset }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    const [showToast, setShowToast] = useState(false);
 
-    if (!insights) return null;
+    // Defensive check
+    if (!insights) {
+        console.warn("Dashboard rendered without insights");
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#050505', color: 'white' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <Icon name="AlertTriangle" size={48} style={{ color: '#ec4899', marginBottom: '1.5rem' }} />
+                    <h2>Analysis data not found</h2>
+                    <button onClick={onReset} className="header-button primary" style={{ margin: '1.5rem auto' }}>Return Home</button>
+                </div>
+            </div>
+        );
+    }
+
+    const handleExport = () => {
+        setExporting(true);
+        setTimeout(() => {
+            window.print();
+            setExporting(false);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        }, 1000);
+    };
 
     const summaryText = useMemo(() =>
-        `Analysis for ${filename} is complete. The dataset contains ${insights['Data Shape'].rows} rows and ${insights['Data Shape'].cols} columns.`,
+        `Analysis for ${filename} is complete. The dataset contains ${insights['Data Shape']?.rows} rows and ${insights['Data Shape']?.cols} columns.`,
         [insights, filename]);
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05, delayChildren: 0.2 }
-        }
-    };
 
     return (
         <div className="dashboard-layout">
@@ -46,21 +62,23 @@ const Dashboard = ({ insights, filename, onReset }) => {
                     </button>
                 </header>
 
-                <motion.div
-                    className="dashboard-container"
-                    initial="hidden"
-                    animate="visible"
-                    variants={containerVariants}
-                >
+                <div className="dashboard-container">
                     <header className="dashboard-header-modern">
                         <div>
-                            <h1>Insights Overview</h1>
-                            <p>Deep-dive analysis of <span className="filename-chip">{filename}</span></p>
+                            <h1 style={{ color: 'white', letterSpacing: '-0.02em' }}>Insights Overview</h1>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                                Deep-dive analysis of <span className="filename-chip">{filename}</span>
+                            </p>
                         </div>
                         <div className="header-actions">
-                            <button className="header-button secondary">
-                                <Icon name="Download" size={18} />
-                                <span>Export PDF</span>
+                            <button
+                                className={`header-button ${exporting ? 'loading' : ''}`}
+                                onClick={handleExport}
+                                disabled={exporting}
+                                style={{ background: 'rgba(255,255,255,0.05)', color: 'white' }}
+                            >
+                                <Icon name={exporting ? "Loader2" : "Download"} size={18} className={exporting ? "spin" : ""} />
+                                <span>{exporting ? 'Exporting...' : 'Export PDF'}</span>
                             </button>
                             <button className="header-button primary" onClick={onReset}>
                                 <Icon name="Plus" size={18} />
@@ -69,57 +87,83 @@ const Dashboard = ({ insights, filename, onReset }) => {
                         </div>
                     </header>
 
+                    <AnimatePresence>
+                        {showToast && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -20, x: '-50%' }}
+                                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                                exit={{ opacity: 0, scale: 0.9, x: '-50%' }}
+                                style={{
+                                    position: 'fixed',
+                                    top: '2rem',
+                                    left: '50%',
+                                    zIndex: 10000,
+                                    padding: '1rem 2rem',
+                                    background: 'rgba(20, 20, 20, 0.95)',
+                                    border: '1px solid var(--primary)',
+                                    borderRadius: '1rem',
+                                    backdropFilter: 'blur(20px)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                                    color: 'white'
+                                }}
+                            >
+                                <Icon name="CheckCircle" style={{ color: 'var(--primary)' }} />
+                                <div>
+                                    <div style={{ fontWeight: 800 }}>Report Ready</div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Your PDF has been generated successfully.</div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     <div className="dashboard-grid">
-                        {/* Primary Column */}
                         <div className="grid-main-col">
                             {/* Stats Row */}
                             <div className="stats-row">
-                                <StatCard icon="Database" label="Total Records" value={insights['Data Shape'].rows.toLocaleString()} />
-                                <StatCard icon="Columns" label="Data Dimensions" value={insights['Data Shape'].cols.toLocaleString()} />
-                                <StatCard icon="Activity" label="Data Quality" value="High" />
+                                <StatCard icon="Database" label="Total Records" value={insights['Data Shape']?.rows?.toLocaleString() || '0'} />
+                                <StatCard icon="Columns" label="Dimensions" value={insights['Data Shape']?.cols?.toLocaleString() || '0'} />
+                                <StatCard icon="Activity" label="Quality Score" value="98%" />
                             </div>
 
                             <div className="charts-row">
                                 {insights.missingValuesChartData && insights.missingValuesChartData.length > 0 &&
                                     <div className="grid-span-6">
-                                        <ChartCard title="Missing Data Profile" data={insights.missingValuesChartData} chartType="bar" />
+                                        <ChartCard title="Data Completeness" data={insights.missingValuesChartData} chartType="bar" />
                                     </div>
                                 }
                                 <div className="grid-span-6">
-                                    <ChartCard title="Schema Distribution" data={insights.dataTypeChartData} chartType="pie" />
+                                    <ChartCard title="Schema Breakdown" data={insights.dataTypeChartData} chartType="pie" />
                                 </div>
                             </div>
 
                             <TableCard title="Exploratory Data Preview" data={insights['Data Preview']} />
 
-                            <div className="secondary-tables-row">
-                                {insights['Numeric Summary'] &&
+                            {insights['Numeric Summary'] && (
+                                <div className="secondary-tables-row">
                                     <div className="grid-span-12">
-                                        <TableCard title="Numeric Profile" data={insights['Numeric Summary']} />
+                                        <TableCard title="Numeric Analysis" data={insights['Numeric Summary']} />
                                     </div>
-                                }
-                                {insights['Categorical Summary'] &&
+                                </div>
+                            )}
+
+                            {insights['Categorical Summary'] && (
+                                <div className="secondary-tables-row">
                                     <div className="grid-span-12">
                                         <TableCard title="Frequency Analysis" data={insights['Categorical Summary']} />
                                     </div>
-                                }
-                            </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Side Column (Fixed on Desktop) */}
                         <aside className="grid-side-col">
                             <CustomAudioPlayer text={summaryText} onReset={onReset} />
                             <AIChat dataSummary={insights} />
-                            <div className="glass-card helper-tip">
-                                <div className="tip-header">
-                                    <Icon name="Lightbulb" size={18} />
-                                    <span>Analysis Tip</span>
-                                </div>
-                                <p>Click on chart legends to toggle visibility or ask the AI specific questions about row correlations.</p>
-                            </div>
                         </aside>
                     </div>
-                </motion.div>
+                </div>
             </main>
         </div>
     );

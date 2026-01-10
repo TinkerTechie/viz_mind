@@ -53,7 +53,7 @@ export const getAIInsights = async (dataSummary, userQuery) => {
 
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini", // Optimized for speed and intelligence
+            model: "gpt-3.5-turbo", // Defaulting to 3.5 for speed, but instructions allow for power
             messages: [
                 { role: "system", content: systemMessage },
                 { role: "user", content: prompt }

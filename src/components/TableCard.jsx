@@ -2,85 +2,86 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from './Icon';
 
-const Table = ({ data }) => {
+const TableCard = ({ title, data }) => {
+    const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [searchTerm, setSearchTerm] = useState('');
     const rowsPerPage = 10;
 
-    if (!data) return <p className="table-placeholder">No data to display.</p>;
-
     const { headers, rows } = useMemo(() => {
-        let h = [];
-        let r = [];
-        if (Array.isArray(data)) {
-            if (data.length > 0) {
-                h = Object.keys(data[0]);
-                r = data.map(row => h.map(col => row[col]));
-            }
-        } else if (data.headers && data.rows) {
-            h = data.headers;
-            r = data.rows;
+        if (!data || !data.headers || !data.rows) return { headers: [], rows: [] };
+
+        let filteredRows = data.rows;
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filteredRows = data.rows.filter(row =>
+                row.some(cell => String(cell).toLowerCase().includes(query))
+            );
         }
-        return { headers: h, rows: r };
-    }, [data]);
 
-    const filteredRows = useMemo(() => {
-        if (!searchTerm) return rows;
-        return rows.filter(row =>
-            row.some(cell =>
-                String(cell).toLowerCase().includes(searchTerm.toLowerCase())
-            )
-        );
-    }, [rows, searchTerm]);
+        return { headers: data.headers, rows: filteredRows };
+    }, [data, searchQuery]);
 
-    const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
-    const paginatedRows = filteredRows.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+    const totalPages = Math.ceil(rows.length / rowsPerPage);
+    const paginatedRows = rows.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-    if (headers.length === 0) return <p className="table-placeholder">No valid data columns found.</p>;
+    if (!data) return null;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ padding: '1rem 2rem', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ position: 'relative', width: '300px' }}>
-                    <Icon name="Search" size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <motion.div
+            className="glass-card table-card"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            style={{ width: '100%', marginBottom: '2.5rem' }}
+        >
+            <div className="table-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '4px', height: '1.25rem', background: 'var(--primary)', borderRadius: '2px' }}></div>
+                    <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{title}</span>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                    <Icon name="Search" size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
-                        type="text"
-                        placeholder="Search table..."
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        type="search"
+                        placeholder="Search data..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                        }}
                         style={{
-                            width: '100%',
-                            background: 'rgba(0,0,0,0.2)',
-                            border: '1px solid var(--glass-border)',
-                            borderRadius: '2rem',
                             padding: '0.6rem 1rem 0.6rem 2.5rem',
+                            borderRadius: '0.75rem',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(255,255,255,0.03)',
                             color: 'white',
                             fontSize: '0.85rem',
+                            width: '240px',
                             outline: 'none'
                         }}
                     />
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Showing <span style={{ color: 'white', fontWeight: 600 }}>{filteredRows.length}</span> results
-                </div>
             </div>
 
-            <div className="table-container" style={{ flex: 1 }}>
+            <div className="table-container">
                 <table>
                     <thead>
-                        <tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+                        <tr>
+                            {headers.map((h, i) => <th key={i}>{h}</th>)}
+                        </tr>
                     </thead>
                     <tbody>
-                        <AnimatePresence mode='wait'>
-                            {paginatedRows.map((row, i) => (
+                        <AnimatePresence mode="popLayout">
+                            {paginatedRows.map((row, idx) => (
                                 <motion.tr
-                                    key={`${currentPage}-${i}`}
+                                    key={`${currentPage}-${idx}`}
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    transition={{ delay: i * 0.03 }}
+                                    exit={{ opacity: 0 }}
                                 >
-                                    {row.map((cell, j) => (
-                                        <td key={`${i}-${j}`}>
+                                    {row.map((cell, i) => (
+                                        <td key={i}>
                                             {typeof cell === 'number' ? cell.toLocaleString() : String(cell)}
                                         </td>
                                     ))}
@@ -89,54 +90,43 @@ const Table = ({ data }) => {
                         </AnimatePresence>
                     </tbody>
                 </table>
-                {filteredRows.length === 0 && (
+
+                {rows.length === 0 && (
                     <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        <Icon name="SearchX" size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                        <p>No matches found for "{searchTerm}"</p>
+                        <Icon name="Database" size={40} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                        <p>No matching records found</p>
                     </div>
                 )}
             </div>
 
             {totalPages > 1 && (
-                <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
-                    <button
-                        className="header-button"
-                        disabled={currentPage === 1}
-                        onClick={() => setCurrentPage(prev => prev - 1)}
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
-                    >
-                        <Icon name="ChevronLeft" size={16} /> Previous
-                    </button>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                        Page <span style={{ color: 'var(--primary)' }}>{currentPage}</span> of {totalPages}
+                <div style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, rows.length)} of {rows.length} records
                     </div>
-                    <button
-                        className="header-button"
-                        disabled={currentPage === totalPages}
-                        onClick={() => setCurrentPage(prev => prev + 1)}
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
-                    >
-                        Next <Icon name="ChevronRight" size={16} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', opacity: currentPage === 1 ? 0.3 : 1 }}
+                        >
+                            <Icon name="ChevronLeft" size={16} />
+                        </button>
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 1rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', opacity: currentPage === totalPages ? 0.3 : 1 }}
+                        >
+                            <Icon name="ChevronRight" size={16} />
+                        </button>
+                    </div>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 };
-
-const TableCard = ({ title, data, className }) => (
-    <motion.div
-        className={`table-card glass-card ${className || ''}`}
-        variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-    >
-        <div className="table-card-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Icon name="Table" size={20} style={{ color: 'var(--primary)' }} />
-                <span>{title}</span>
-            </div>
-        </div>
-        <Table data={data} />
-    </motion.div>
-);
 
 export default TableCard;
