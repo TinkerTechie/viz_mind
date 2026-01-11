@@ -112,6 +112,29 @@ const FileUploadScreen = ({ onFileSelect, setLoading, setError }) => {
                     </div>
                 </div>
 
+                <div className="sample-data-container">
+                    <p className="sample-text">No data? Try out our sample dataset</p>
+                    <button
+                        className="btn-sample"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const sampleCsv = `Date,Product,Category,Sales,Quantity,Region
+2023-01-01,Smartphone,Electronics,500,10,North
+2023-01-02,Laptop,Electronics,1200,5,West
+2023-01-03,Headphones,Electronics,150,20,East
+2023-01-04,T-shirt,Apparel,25,100,South
+2023-01-05,Jeans,Apparel,60,50,North
+2023-01-06,Smartphone,Electronics,500,8,South
+2023-01-07,Laptop,Electronics,1200,3,North`;
+                            const blob = new Blob([sampleCsv], { type: 'text/csv' });
+                            const file = new File([blob], "sample_sales_data.csv", { type: 'text/csv' });
+                            handleFile(file);
+                        }}
+                    >
+                        <Icon name="Database" size={14} /> Load Sample Data
+                    </button>
+                </div>
+
                 <div className="upload-footer-features">
                     <div className="footer-feature"><Icon name="Zap" size={14} /> Instant Processing</div>
                     <div className="footer-feature"><Icon name="Lock" size={14} /> Data Privacy</div>

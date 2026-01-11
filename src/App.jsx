@@ -13,6 +13,11 @@ function App() {
     const [error, setError] = useState(null);
 
     const handleFileSelect = useCallback(async (selectedFile) => {
+        if (!window.dfd) {
+            setError("Analysis engine is still loading. Please wait a few seconds and try again.");
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 
@@ -24,6 +29,7 @@ function App() {
             setFile(selectedFile);
             setInsights(newInsights);
         } catch (err) {
+            console.error("App Analysis Error:", err);
             setError(err.message || "An unexpected error occurred during analysis.");
             setFile(null);
         } finally {

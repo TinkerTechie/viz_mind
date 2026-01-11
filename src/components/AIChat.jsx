@@ -148,13 +148,15 @@ const AIChat = ({ dataSummary }) => {
                         <div style={{
                             padding: '1rem 1.25rem',
                             borderRadius: msg.role === 'user' ? '1.25rem 1.25rem 0 1.25rem' : '1.25rem 1.25rem 1.25rem 0',
-                            background: msg.role === 'user' ? 'linear-gradient(135deg, var(--primary), var(--accent))' : msg.role === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid ' + (msg.role === 'user' ? 'transparent' : msg.role === 'error' ? '#ef4444' : 'var(--glass-border)'),
+                            background: msg.role === 'user' ? 'linear-gradient(135deg, var(--primary), var(--accent, #6366f1))' : msg.role === 'error' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid ' + (msg.role === 'user' ? 'transparent' : msg.role === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'var(--glass-border)'),
                             color: msg.role === 'user' ? 'white' : 'var(--text-main)',
-                            fontSize: '0.95rem',
+                            fontSize: '0.9rem',
                             lineHeight: '1.6',
-                            boxShadow: msg.role === 'user' ? '0 10px 15px -3px rgba(99, 102, 241, 0.3)' : 'none'
+                            boxShadow: msg.role === 'user' ? '0 10px 15px -3px rgba(99, 102, 241, 0.3)' : 'none',
+                            position: 'relative'
                         }}>
+                            {msg.role === 'error' && <Icon name="AlertTriangle" size={14} style={{ marginRight: '0.5rem', verticalAlign: 'middle', color: '#ef4444' }} />}
                             {msg.content}
                         </div>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', padding: '0 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CustomAudioPlayer from './CustomAudioPlayer';
 import StatCard from './StatCard';
@@ -10,8 +10,10 @@ import { Icon } from './Icon';
 
 const Dashboard = ({ insights, filename, onReset }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [activeSection, setActiveSection] = useState('Dashboard');
     const [exporting, setExporting] = useState(false);
     const [showToast, setShowToast] = useState(false);
+    const reportRef = useRef(null);
 
     // Defensive check
     if (!insights) {
@@ -27,19 +29,118 @@ const Dashboard = ({ insights, filename, onReset }) => {
         );
     }
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        if (!window.html2pdf) {
+            console.error("html2pdf library not loaded");
+            return;
+        }
+
         setExporting(true);
-        setTimeout(() => {
-            window.print();
-            setExporting(false);
+        const element = reportRef.current;
+        const opt = {
+            margin: 10,
+            filename: `VizMind_Report_${filename.replace('.csv', '')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#050505' // Match app background
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            await window.html2pdf().set(opt).from(element).save();
             setShowToast(true);
             setTimeout(() => setShowToast(false), 3000);
-        }, 1000);
+        } catch (error) {
+            console.error("PDF Export Error:", error);
+        } finally {
+            setExporting(false);
+        }
     };
 
     const summaryText = useMemo(() =>
         `Analysis for ${filename} is complete. The dataset contains ${insights['Data Shape']?.rows} rows and ${insights['Data Shape']?.cols} columns.`,
         [insights, filename]);
+
+    const renderContent = () => {
+        const variants = {
+            initial: { opacity: 0, y: 20 },
+            animate: { opacity: 1, y: 0 },
+            exit: { opacity: 0, y: -20 }
+        };
+
+        switch (activeSection) {
+            case 'Visualizations':
+                return (
+                    <motion.div key="viz" variants={variants} initial="initial" animate="animate" exit="exit" className="grid-main-col">
+                        <div className="charts-row">
+                            {insights.missingValuesChartData && insights.missingValuesChartData.length > 0 &&
+                                <div className="grid-span-6">
+                                    <ChartCard title="Data Completeness" data={insights.missingValuesChartData} chartType="bar" />
+                                </div>
+                            }
+                            <div className="grid-span-6">
+                                <ChartCard title="Schema Breakdown" data={insights.dataTypeChartData} chartType="pie" />
+                            </div>
+                        </div>
+                        {/* You can add more specific charts here if needed */}
+                        <div className="glass-card" style={{ padding: '4rem', textAlign: 'center', opacity: 0.5 }}>
+                            <Icon name="BarChart3" size={48} style={{ marginBottom: '1rem', color: 'var(--primary)' }} />
+                            <h3>More Visualizations coming soon</h3>
+                            <p>We are working on advanced correlation matrices and trend analysis.</p>
+                        </div>
+                    </motion.div>
+                );
+            case 'Raw Data':
+                return (
+                    <motion.div key="raw" variants={variants} initial="initial" animate="animate" exit="exit" className="grid-main-col">
+                        <TableCard title="Exploratory Data Preview" data={insights['Data Preview']} />
+                        {insights['Numeric Summary'] && <TableCard title="Numeric Analysis" data={insights['Numeric Summary']} />}
+                        {insights['Categorical Summary'] && <TableCard title="Frequency Analysis" data={insights['Categorical Summary']} />}
+                    </motion.div>
+                );
+            case 'AI Assistant':
+                return (
+                    <motion.div key="ai" variants={variants} initial="initial" animate="animate" exit="exit" className="grid-main-col">
+                        <AIChat dataSummary={insights} />
+                    </motion.div>
+                );
+            case 'Dashboard':
+            default:
+                return (
+                    <motion.div key="dash" variants={variants} initial="initial" animate="animate" exit="exit" className="dashboard-grid">
+                        <div className="grid-main-col">
+                            {/* Stats Row */}
+                            <div className="stats-row">
+                                <StatCard icon="Database" label="Total Records" value={insights['Data Shape']?.rows?.toLocaleString() || '0'} />
+                                <StatCard icon="Columns" label="Dimensions" value={insights['Data Shape']?.cols?.toLocaleString() || '0'} />
+                                <StatCard icon="Activity" label="Quality Score" value="98%" />
+                            </div>
+
+                            <div className="charts-row">
+                                {insights.missingValuesChartData && insights.missingValuesChartData.length > 0 &&
+                                    <div className="grid-span-6">
+                                        <ChartCard title="Data Completeness" data={insights.missingValuesChartData} chartType="bar" />
+                                    </div>
+                                }
+                                <div className="grid-span-6">
+                                    <ChartCard title="Schema Breakdown" data={insights.dataTypeChartData} chartType="pie" />
+                                </div>
+                            </div>
+
+                            <TableCard title="Exploratory Data Preview" data={insights['Data Preview']} />
+                        </div>
+
+                        <aside className="grid-side-col">
+                            <CustomAudioPlayer text={summaryText} onReset={onReset} />
+                            <AIChat dataSummary={insights} />
+                        </aside>
+                    </motion.div>
+                );
+        }
+    };
 
     return (
         <div className="dashboard-layout">
@@ -48,11 +149,13 @@ const Dashboard = ({ insights, filename, onReset }) => {
                 filename={filename}
                 isOpen={isSidebarOpen}
                 setIsOpen={setIsSidebarOpen}
+                activeSection={activeSection}
+                onSectionChange={setActiveSection}
             />
 
             <main className="main-content">
                 {/* Mobile Header */}
-                <header className="mobile-header">
+                <header className="mobile-header" data-html2canvas-ignore>
                     <button className="menu-toggle" onClick={() => setIsSidebarOpen(true)}>
                         <Icon name="Menu" size={24} />
                     </button>
@@ -62,15 +165,15 @@ const Dashboard = ({ insights, filename, onReset }) => {
                     </button>
                 </header>
 
-                <div className="dashboard-container">
+                <div className="dashboard-container" ref={reportRef}>
                     <header className="dashboard-header-modern">
                         <div>
-                            <h1 style={{ color: 'white', letterSpacing: '-0.02em' }}>Insights Overview</h1>
+                            <h1 style={{ color: 'white', letterSpacing: '-0.02em' }}>{activeSection}</h1>
                             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginTop: '0.5rem' }}>
-                                Deep-dive analysis of <span className="filename-chip">{filename}</span>
+                                Analysis of <span className="filename-chip">{filename}</span>
                             </p>
                         </div>
-                        <div className="header-actions">
+                        <div className="header-actions" data-html2canvas-ignore>
                             <button
                                 className={`header-button ${exporting ? 'loading' : ''}`}
                                 onClick={handleExport}
@@ -119,50 +222,9 @@ const Dashboard = ({ insights, filename, onReset }) => {
                         )}
                     </AnimatePresence>
 
-                    <div className="dashboard-grid">
-                        <div className="grid-main-col">
-                            {/* Stats Row */}
-                            <div className="stats-row">
-                                <StatCard icon="Database" label="Total Records" value={insights['Data Shape']?.rows?.toLocaleString() || '0'} />
-                                <StatCard icon="Columns" label="Dimensions" value={insights['Data Shape']?.cols?.toLocaleString() || '0'} />
-                                <StatCard icon="Activity" label="Quality Score" value="98%" />
-                            </div>
-
-                            <div className="charts-row">
-                                {insights.missingValuesChartData && insights.missingValuesChartData.length > 0 &&
-                                    <div className="grid-span-6">
-                                        <ChartCard title="Data Completeness" data={insights.missingValuesChartData} chartType="bar" />
-                                    </div>
-                                }
-                                <div className="grid-span-6">
-                                    <ChartCard title="Schema Breakdown" data={insights.dataTypeChartData} chartType="pie" />
-                                </div>
-                            </div>
-
-                            <TableCard title="Exploratory Data Preview" data={insights['Data Preview']} />
-
-                            {insights['Numeric Summary'] && (
-                                <div className="secondary-tables-row">
-                                    <div className="grid-span-12">
-                                        <TableCard title="Numeric Analysis" data={insights['Numeric Summary']} />
-                                    </div>
-                                </div>
-                            )}
-
-                            {insights['Categorical Summary'] && (
-                                <div className="secondary-tables-row">
-                                    <div className="grid-span-12">
-                                        <TableCard title="Frequency Analysis" data={insights['Categorical Summary']} />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <aside className="grid-side-col">
-                            <CustomAudioPlayer text={summaryText} onReset={onReset} />
-                            <AIChat dataSummary={insights} />
-                        </aside>
-                    </div>
+                    <AnimatePresence mode="wait">
+                        {renderContent()}
+                    </AnimatePresence>
                 </div>
             </main>
         </div>

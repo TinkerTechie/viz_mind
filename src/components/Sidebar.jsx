@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from './Icon';
 
-const Sidebar = ({ onReset, filename, isOpen, setIsOpen }) => {
+const Sidebar = ({ onReset, filename, isOpen, setIsOpen, activeSection = 'Dashboard', onSectionChange }) => {
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
@@ -13,11 +13,20 @@ const Sidebar = ({ onReset, filename, isOpen, setIsOpen }) => {
     }, []);
 
     const menuItems = [
-        { icon: 'LayoutDashboard', label: 'Dashboard', active: true },
+        { icon: 'LayoutDashboard', label: 'Dashboard' },
         { icon: 'PieChart', label: 'Visualizations' },
         { icon: 'Table', label: 'Raw Data' },
         { icon: 'MessageSquare', label: 'AI Assistant' },
     ];
+
+    const handleItemClick = (label) => {
+        if (onSectionChange) {
+            onSectionChange(label);
+        }
+        if (isMobile) {
+            setIsOpen(false);
+        }
+    };
 
     return (
         <>
@@ -43,7 +52,9 @@ const Sidebar = ({ onReset, filename, isOpen, setIsOpen }) => {
             >
                 <div className="sidebar-header">
                     <div className="logo-container">
-                        <div className="logo-icon">VM</div>
+                        <div className="logo-icon">
+                            <Icon name="BrainCircuit" size={24} />
+                        </div>
                         <span className="logo-text">VizMind</span>
                     </div>
                 </div>
@@ -53,7 +64,11 @@ const Sidebar = ({ onReset, filename, isOpen, setIsOpen }) => {
                         <span className="section-label">Main Menu</span>
                         <div className="nav-items" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {menuItems.map((item, idx) => (
-                                <div key={idx} className={`nav-item ${item.active ? 'active' : ''}`}>
+                                <div
+                                    key={idx}
+                                    className={`nav-item ${activeSection === item.label ? 'active' : ''}`}
+                                    onClick={() => handleItemClick(item.label)}
+                                >
                                     <Icon name={item.icon} size={20} />
                                     <span>{item.label}</span>
                                 </div>
