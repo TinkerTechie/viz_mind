@@ -65,31 +65,66 @@ const TableCard = ({ title, data }) => {
             </div>
 
             <div className="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            {headers.map((h, i) => <th key={i}>{h}</th>)}
-                        </tr>
-                    </thead>
-                    <tbody>
+                {headers.length > 5 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', padding: '1.5rem' }}>
                         <AnimatePresence mode="popLayout">
                             {paginatedRows.map((row, idx) => (
-                                <motion.tr
+                                <motion.div
                                     key={`${currentPage}-${idx}`}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: '1rem',
+                                        padding: '1.25rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.75rem'
+                                    }}
                                 >
                                     {row.map((cell, i) => (
-                                        <td key={i}>
-                                            {typeof cell === 'number' ? cell.toLocaleString() : String(cell)}
-                                        </td>
+                                        <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.2rem' }}>
+                                                {headers[i]}
+                                            </span>
+                                            <span style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.9)', wordBreak: 'break-word', lineHeight: '1.4' }}>
+                                                {typeof cell === 'number' ? cell.toLocaleString() : String(cell)}
+                                            </span>
+                                        </div>
                                     ))}
-                                </motion.tr>
+                                </motion.div>
                             ))}
                         </AnimatePresence>
-                    </tbody>
-                </table>
+                    </div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr>
+                                {headers.map((h, i) => <th key={i}>{h}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <AnimatePresence mode="popLayout">
+                                {paginatedRows.map((row, idx) => (
+                                    <motion.tr
+                                        key={`${currentPage}-${idx}`}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                    >
+                                        {row.map((cell, i) => (
+                                            <td key={i}>
+                                                {typeof cell === 'number' ? cell.toLocaleString() : String(cell)}
+                                            </td>
+                                        ))}
+                                    </motion.tr>
+                                ))}
+                            </AnimatePresence>
+                        </tbody>
+                    </table>
+                )}
 
                 {rows.length === 0 && (
                     <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
